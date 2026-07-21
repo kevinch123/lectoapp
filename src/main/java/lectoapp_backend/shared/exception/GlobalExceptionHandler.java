@@ -56,6 +56,28 @@ public class GlobalExceptionHandler {
                 .body(error);
 
         }
+        /**
+         * Maneja las excepciones cuando un recurso solicitado
+         * no existe en el sistema.
+         */
+        @ExceptionHandler(ResourceNotFoundException.class)
+        public ResponseEntity<ApiError> manejarRecursoNoEncontrado(
+                ResourceNotFoundException ex,
+                HttpServletRequest request
+        ) {
+
+        ApiError error = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(error);
+
+        }
         // @ExceptionHandler(Exception.class)
         // public ResponseEntity<ApiError> manejarGeneral(
         //         Exception ex,

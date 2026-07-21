@@ -2,6 +2,7 @@ package lectoapp_backend.infraestructure.persistence.entity;
 
 
 import jakarta.persistence.*;
+import lectoapp_backend.shared.enums.Rol;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -34,8 +35,9 @@ public class UsuarioEntity {
     @Column(nullable = false)
     private String password;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String rol;
+    private Rol rol;
 
     @Column(nullable = false)
     private Boolean activo;
