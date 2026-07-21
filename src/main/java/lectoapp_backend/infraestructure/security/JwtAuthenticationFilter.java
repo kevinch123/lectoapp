@@ -9,12 +9,15 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lectoapp_backend.application.service.JwtService;
+import lectoapp_backend.domain.model.Estudiante;
 import lectoapp_backend.domain.model.Usuario;
+import lectoapp_backend.domain.repository.EstudianteRepository;
 import lectoapp_backend.domain.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 
@@ -36,6 +39,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final UsuarioRepository usuarioRepository;
 
+    private final EstudianteRepository estudianteRepository;
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -54,39 +59,56 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Extrae únicamente el JWT.
         String token = authHeader.substring(7);
 
-        // Obtiene el correo almacenado dentro del token.
-        String correo = jwtService.extraerCorreo(token);
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            try {
+                String rol = jwtService.extraerRol(token);
 
-        // Si ya existe un usuario autenticado no hacemos nada.
-        if (correo != null &&
-                SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = null;
 
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(correo);
+                if ("ESTUDIANTE".equals(rol)) {
+                    Long estudianteId = jwtService.extraerId(token);
 
-            Usuario usuario = usuarioRepository
-                    .buscarPorCorreo(correo)
-                    .orElseThrow(() ->
-                        new RuntimeException("Usuario no encontrado."));
+                    Estudiante estudiante = estudianteRepository
+                            .buscarPorId(estudianteId)
+                            .orElseThrow(() ->
+                                    new RuntimeException("Estudiante no encontrado."));
 
-            if (jwtService.esTokenValido(token, usuario)) {
+                    if (jwtService.esTokenValidoEstudiante(token, estudiante)) {
+                        userDetails = new SecurityStudent(estudiante);
+                    }
+                } else {
+                    String correo = jwtService.extraerCorreo(token);
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities());
+                    userDetails = userDetailsService.loadUserByUsername(correo);
 
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request));
+                    Usuario usuario = usuarioRepository
+                            .buscarPorCorreo(correo)
+                            .orElseThrow(() ->
+                                    new RuntimeException("Usuario no encontrado."));
 
-                SecurityContextHolder
-                        .getContext()
-                        .setAuthentication(authentication);
+                    if (!jwtService.esTokenValido(token, usuario)) {
+                        userDetails = null;
+                    }
+                }
 
+                if (userDetails != null) {
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities());
+
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource()
+                                    .buildDetails(request));
+
+                    SecurityContextHolder
+                            .getContext()
+                            .setAuthentication(authentication);
+                }
+            } catch (JwtException | IllegalArgumentException ex) {
+                // Token inválido o mal formado. No autenticamos.
             }
-
         }
 
         filterChain.doFilter(request, response);

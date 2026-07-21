@@ -45,8 +45,9 @@ public class SecurityConfig {
             // Configuración de permisos
             .authorizeHttpRequests(auth -> auth
 
-                    // Login
+                    // Login de docentes y estudiantes
                     .requestMatchers("/auth/login").permitAll()
+                    .requestMatchers("/auth/estudiante/login").permitAll()
 
                     // Acceso de estudiantes mediante código
                     .requestMatchers("/api/estudiantes/validar").permitAll()

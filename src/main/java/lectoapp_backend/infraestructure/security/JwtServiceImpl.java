@@ -12,6 +12,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lectoapp_backend.application.service.JwtService;
+import lectoapp_backend.domain.model.Estudiante;
 import lectoapp_backend.domain.model.Usuario;
 
 /**
@@ -45,6 +46,30 @@ public class JwtServiceImpl implements JwtService {
 
         return Jwts.builder()
                 .subject(usuario.getCorreo())
+                .claim("rol", usuario.getRol().name())
+                .issuedAt(fechaActual)
+                .expiration(fechaExpiracion)
+                .signWith(obtenerClave())
+                .compact();
+    }
+
+    /**
+     * Genera un JWT para el estudiante autenticado.
+     */
+    @Override
+    public String generarToken(Estudiante estudiante) {
+
+        Date fechaActual = new Date();
+
+        Date fechaExpiracion = new Date(
+                fechaActual.getTime() + expiration
+        );
+
+        return Jwts.builder()
+                .subject(String.valueOf(estudiante.getId()))
+                .claim("id", estudiante.getId())
+                .claim("codigo", estudiante.getCodigoAcceso())
+                .claim("rol", "ESTUDIANTE")
                 .issuedAt(fechaActual)
                 .expiration(fechaExpiracion)
                 .signWith(obtenerClave())
@@ -62,6 +87,42 @@ public class JwtServiceImpl implements JwtService {
     }
 
     /**
+     * Extrae el ID de estudiante contenido en el JWT.
+     */
+    @Override
+    public Long extraerId(String token) {
+
+        Object idClaim = obtenerClaims(token).get("id");
+
+        if (idClaim instanceof Number) {
+            return ((Number) idClaim).longValue();
+        }
+
+        return idClaim == null ? null : Long.valueOf(idClaim.toString());
+
+    }
+
+    /**
+     * Extrae el código de acceso contenido en el JWT.
+     */
+    @Override
+    public String extraerCodigo(String token) {
+
+        return obtenerClaims(token).get("codigo", String.class);
+
+    }
+
+    /**
+     * Extrae el rol contenido dentro del JWT.
+     */
+    @Override
+    public String extraerRol(String token) {
+
+        return obtenerClaims(token).get("rol", String.class);
+
+    }
+
+    /**
      * Valida que el token pertenezca al usuario y que no esté expirado.
      */
     @Override
@@ -70,6 +131,22 @@ public class JwtServiceImpl implements JwtService {
         String correo = extraerCorreo(token);
 
         return correo.equals(usuario.getCorreo())
+                && !estaExpirado(token);
+
+    }
+
+    /**
+     * Valida que el token pertenezca al estudiante y que no esté expirado.
+     */
+    @Override
+    public boolean esTokenValidoEstudiante(String token, Estudiante estudiante) {
+
+        Long id = extraerId(token);
+        String codigo = extraerCodigo(token);
+
+        return id != null
+                && id.equals(estudiante.getId())
+                && codigo.equals(estudiante.getCodigoAcceso())
                 && !estaExpirado(token);
 
     }
